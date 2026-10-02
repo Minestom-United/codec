@@ -4,7 +4,6 @@ on:
   pull_request:
   push:
     branches: [ master ]
-    tags: [ "v*" ]
 
 permissions:
   contents: read
@@ -16,6 +15,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      status: ${{ steps.version.outputs.status }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -47,11 +49,42 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
 
-          echo "Version: $VERSION ($STATUS)"
+          echo "Version: $VERSION ($STATUS) on $GITHUB_REF"
           echo "### Version: \`$VERSION\` ($STATUS)" >> "$GITHUB_STEP_SUMMARY"
 
+  publish:
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # needed to create the tag and release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 25
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Check for existing release
+        id: existing
+        if: needs.build.outputs.status == 'release'
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ needs.build.outputs.version }}" > /dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Tag v${{ needs.build.outputs.version }} already exists, skipping release"
+            echo "### Tag \`v${{ needs.build.outputs.version }}\` already exists, nothing released" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish snapshot
-        if: steps.version.outputs.status == 'snapshot' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: needs.build.outputs.status == 'snapshot'
         run: >
           ./gradlew
           publishAllPublicationsToMinestomUnitedRepositoryRepository
@@ -63,7 +96,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
 
       - name: Publish release
-        if: steps.version.outputs.status == 'release' && github.ref == format('refs/tags/v{0}', steps.version.outputs.version)
+        if: needs.build.outputs.status == 'release' && steps.existing.outputs.exists == 'false'
         run: >
           ./gradlew
           publishAllPublicationsToMinestomUnitedRepositoryRepository
@@ -75,3 +108,13 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
+
+      - name: Create tag and GitHub release
+        if: needs.build.outputs.status == 'release' && steps.existing.outputs.exists == 'false'
+        run: >
+          gh release create "v${{ needs.build.outputs.version }}"
+          --target "$GITHUB_SHA"
+          --title "v${{ needs.build.outputs.version }}"
+          --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
