@@ -13,7 +13,7 @@ dependencies {
 }
 
 group = "dev.minestom-united"
-version = "0.1.1-SNAPSHOT"
+version = "0.1.0-SNAPSHOT"
 description = "A library to get Minestom codecs everywhere"
 
 java {
