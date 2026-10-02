@@ -1,13 +1,10 @@
 [versions]
 adventure = "5.2.0"
-jetbrainsAnnotations = "26.1.0"
 gson = "2.14.0"
 publish = "0.37.0"
 
 [libraries]
-jetbrainsAnnotations = { module = "org.jetbrains:annotations", version.ref = "jetbrainsAnnotations" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
-minimessage = { module = "net.kyori:adventure-text-minimessage", version.ref = "adventure" }
 adventure = { module = "net.kyori:adventure-api", version.ref = "adventure" }
 adventure-nbt = { module = "net.kyori:adventure-nbt", version.ref = "adventure" }
 
