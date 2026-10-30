@@ -1,6 +1,6 @@
 [versions]
 adventure = "5.2.0"
-gson = "2.14.0"
+gson = "2.15.0"
 publish = "0.37.0"
 
 [libraries]
